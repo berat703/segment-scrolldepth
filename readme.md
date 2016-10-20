@@ -11,12 +11,16 @@ Segment Scroll Depth is a fork of [Scroll Depth](https://github.com/robflaherty/
 
 3. Add the following code to any page where you want to track scroll depths as events in Segment.
 
-    <script src="path-to-script/segment-scroll-depth.min.js"></script>
-    <script>
-      jQuery(function() {
-      jQuery.scrollDepth();
-    });
-    </script>
+```
+
+<script src="path-to-script/segment-scroll-depth.min.js"></script>
+<script>
+jQuery(function() {
+  jQuery.scrollDepth();
+});
+</script>
+
+```
 
 (Where `path-to-script` is the location of the script.)
 
