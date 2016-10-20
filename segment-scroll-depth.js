@@ -1,7 +1,7 @@
 /*!
  * @preserve
  * jquery.scrolldepth.js | v0.9.1
- * Copyright (c) 2016 Rob Flaherty (@robflaherty)
+ * Copyright (c) 2016 Rob Flaherty (@robflaherty), Grigoriy Kogan (@gkogan)
  * Licensed under the MIT and GPL licenses.
  */
 
@@ -26,22 +26,18 @@
 
     var defaults = {
       minHeight: 0,
+      // Optional: Choose which elements should trigger a scroll depth event when reached
       elements: [],
       percentage: true,
-      userTiming: true,
+      userTiming: false,
       pixelDepth: true,
-      nonInteraction: true,
-      gaGlobal: false,
-      gtmOverride: false
+      nonInteraction: true
     };
 
     var $window = $(window),
       cache = [],
       scrollEventBound = false,
       lastPixelDepth = 0,
-      universalGA,
-      classicGA,
-      gaGlobal,
       standardEventHandler;
 
     /*
@@ -59,34 +55,22 @@
         return;
       }
 
-      /*
-       * Determine which version of GA is being used
-       * "ga", "__gaTracker", _gaq", and "dataLayer" are the possible globals
-       */
+      standardEventHandler = function(eventName, data) {
 
-      if (options.gaGlobal) {
-        universalGA = true;
-        gaGlobal = options.gaGlobal;
-      } else if (typeof ga === "function") {
-        universalGA = true;
-        gaGlobal = 'ga';
-      } else if (typeof __gaTracker === "function") {
-        universalGA = true;
-        gaGlobal = '__gaTracker';
-      }
+        // Send event to Segment
+        analytics.track(eventName, data, {
+          
+          // Choose which integrations should receive scroll depth events from Segment
+          // Not recommended for integrations with low API limits (such as Salesforce) or volume-based billing (such as Mixpanel)
+          integrations: {
+            'All': false,
+            'Google Analytics': true,
+            'Mixpanel': false,
+            'Salesforce': false
+          }
+        });
 
-      if (typeof _gaq !== "undefined" && typeof _gaq.push === "function") {
-        classicGA = true;
-      }
-
-      if (typeof options.eventHandler === "function") {
-        standardEventHandler = options.eventHandler;
-      } else if (typeof dataLayer !== "undefined" && typeof dataLayer.push === "function" && !options.gtmOverride) {
-
-        standardEventHandler = function(data) {
-          dataLayer.push(data);
-        };
-      }
+      };
 
       /*
        * Functions
@@ -96,47 +80,26 @@
 
         if (standardEventHandler) {
 
-          standardEventHandler({'event': 'ScrollDistance', 'eventCategory': 'Scroll Depth', 'eventAction': action, 'eventLabel': label, 'eventValue': 1, 'eventNonInteraction': options.nonInteraction});
+          standardEventHandler(action, {
+            'category': 'Scroll Depth',
+            'label': label,
+            'eventNonInteraction': options.nonInteraction
+          });
 
           if (options.pixelDepth && arguments.length > 2 && scrollDistance > lastPixelDepth) {
             lastPixelDepth = scrollDistance;
-            standardEventHandler({'event': 'ScrollDistance', 'eventCategory': 'Scroll Depth', 'eventAction': 'Pixel Depth', 'eventLabel': rounded(scrollDistance), 'eventValue': 1, 'eventNonInteraction': options.nonInteraction});
+            standardEventHandler("Pixel Depth", {
+              'category': 'Scroll Depth',
+              'label': rounded(scrollDistance),
+              'eventNonInteraction': options.nonInteraction
+            });
           }
 
           if (options.userTiming && arguments.length > 3) {
-            standardEventHandler({'event': 'ScrollTiming', 'eventCategory': 'Scroll Depth', 'eventAction': action, 'eventLabel': label, 'eventTiming': timing});
-          }
-
-        } else {
-
-          if (universalGA) {
-
-            window[gaGlobal]('send', 'event', 'Scroll Depth', action, label, 1, {'nonInteraction': options.nonInteraction});
-
-            if (options.pixelDepth && arguments.length > 2 && scrollDistance > lastPixelDepth) {
-              lastPixelDepth = scrollDistance;
-              window[gaGlobal]('send', 'event', 'Scroll Depth', 'Pixel Depth', rounded(scrollDistance), 1, {'nonInteraction': options.nonInteraction});
-            }
-
-            if (options.userTiming && arguments.length > 3) {
-              window[gaGlobal]('send', 'timing', 'Scroll Depth', action, timing, label);
-            }
-
-          }
-
-          if (classicGA) {
-
-            _gaq.push(['_trackEvent', 'Scroll Depth', action, label, 1, options.nonInteraction]);
-
-            if (options.pixelDepth && arguments.length > 2 && scrollDistance > lastPixelDepth) {
-              lastPixelDepth = scrollDistance;
-              _gaq.push(['_trackEvent', 'Scroll Depth', 'Pixel Depth', rounded(scrollDistance), 1, options.nonInteraction]);
-            }
-
-            if (options.userTiming && arguments.length > 3) {
-              _gaq.push(['_trackTiming', 'Scroll Depth', action, timing, label, 100]);
-            }
-
+            // User Timing events are fired alongside the other events.
+            // Their purpose is to record the amount of time between the page load and the scroll point.
+            // These events are found in Google Analytics under Site Speed > User Timings.
+            standardEventHandler(action, {'category': 'Scroll Depth', 'label': label, 'eventTiming': timing});
           }
 
         }
@@ -291,7 +254,7 @@
             // Recalculate percentage marks
             marks = calculateMarks(docHeight),
 
-            // Timing
+            // timing
             timing = +new Date - startTime;
 
           // If all marks already hit, unbind scroll event
